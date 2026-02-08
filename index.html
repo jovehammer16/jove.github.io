@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Software engineer portfolio featuring experience, projects, skills, and ways to connect."
+    />
+    <title>Jove Tsui (Siu Yu Tsui) | Software Engineer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="background-shape shape-one" aria-hidden="true"></div>
+    <div class="background-shape shape-two" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#home">Jove Tsui</a>
+        <button class="menu-toggle" aria-expanded="false" aria-controls="site-nav">
+          Menu
+        </button>
+        <nav id="site-nav" class="site-nav" aria-label="Primary Navigation">
+          <a href="#about">About</a>
+          <a href="#experience">Experience</a>
+          <a href="#projects">Projects</a>
+          <a href="#skills">Skills</a>
+          <a href="#education">Education</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="home">
+      <section class="hero section container">
+        <p class="eyebrow">Senior Software Engineer</p>
+        <p class="name-note">Jove (preferred name) · Siu Yu Tsui (official name)</p>
+        <h1>
+          I build scalable backend systems for loyalty, finance, and data-heavy platforms.
+        </h1>
+        <p class="hero-text">
+          Software Engineer focused on Java, Spring Boot, AWS services, and event-driven
+          architecture. I have delivered production systems across retail, banking, fintech 
+          and credit bureau domains.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#projects">View Projects</a>
+          <a class="button button-ghost" href="#contact">Let&apos;s Work Together</a>
+        </div>
+      </section>
+
+      <section id="about" class="section container reveal">
+        <h2>About Me</h2>
+        <p>
+          I&apos;m based in St Albans, United Kingdom, and currently work as a Senior Software
+          Engineer at Holland &amp; Barrett. I enjoy building reliable microservices, integrating
+          APIs, and solving complex engineering problems with pragmatic, maintainable solutions.
+        </p>
+      </section>
+
+      <section id="experience" class="section container reveal">
+        <div class="section-heading">
+          <h2>Experience</h2>
+          <p>Professional roles and impact.</p>
+        </div>
+        <div class="timeline">
+          <article class="card">
+            <p class="meta">Nov 2023 - Present</p>
+            <h3>Senior Software Engineer · Holland &amp; Barrett</h3>
+            <ul>
+              <li>Spearheaded the design and implementation of the H&amp;B&amp;Me loyalty program, enabling points accumulation and redemption across the UK.</li>
+              <li>Architected a high-throughput loyalty system and points engine using Java 25 and Spring Boot, replacing a legacy platform to improve scalability and performance.</li>
+              <li>Executed complex data and service migration from the legacy platform to the new architecture with zero downtime for existing loyalty members.</li>
+              <li>Developed and maintained critical customer-facing microservices, including a robust audit log system and a high-availability product subscriptions API.</li>
+              <li>Leveraged Kafka, Redis, and AWS services to meet enterprise-level reliability standards.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <p class="meta">Nov 2021 - Sep 2023</p>
+            <h3>Software Engineer · Beacon</h3>
+            <ul>
+              <li>Designed and deployed scalable microservices across multiple domains using Java 11, Spring Boot, and OpenAPI.</li>
+              <li>Implemented asynchronous messaging and data streaming architectures using AWS SQS, Kinesis, and Kafka.</li>
+              <li>Optimized data persistence strategies with DynamoDB and PostgreSQL for relational and NoSQL use cases.</li>
+              <li>Managed full SDLC responsibilities, including testing and deployment within AWS.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <p class="meta">Jun 2021 - Sep 2021</p>
+            <h3>Full Stack Engineer · HSBC</h3>
+            <ul>
+              <li>Developed commercial banking solutions in a fast-paced financial environment, focusing on secure and reliable backend delivery.</li>
+              <li>Built modular backend components using Java and Spring Boot to support internal banking infrastructure and improve developer efficiency.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <p class="meta">May 2018 - Apr 2021</p>
+            <h3>Senior Analyst Programmer · Nova Credit Limited</h3>
+            <ul>
+              <li>Led the development of a mission-critical credit bureau system for secure financial data processing.</li>
+              <li>Developed a modern web interface using Angular for complex credit reporting tools.</li>
+              <li>Engineered robust backend services with Java 8 and Spring Boot, integrated with MongoDB.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <p class="meta">Jul 2015 - May 2018</p>
+            <h3>Web Developer · Innopage Limited</h3>
+            <ul>
+              <li>Developed and optimized APIs for Ticker Asia Web/Mobile apps using Node.js, MySQL, and Redis.</li>
+              <li>Managed Linux server administration and infrastructure on AWS for internal and client-facing systems.</li>
+              <li>Contributed to mobile development initiatives through native Android programming.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="projects" class="section container reveal">
+        <div class="section-heading">
+          <h2>Projects</h2>
+          <p>Selected initiatives and engineering impact.</p>
+        </div>
+        <div class="projects-grid">
+          <article class="project-card">
+            <h3>Loyalty Programme Platform</h3>
+            <p>
+              Engineered core backend capabilities for a modern loyalty platform, including points
+              accrual and redemption flows, while supporting a zero-disruption migration from legacy
+              systems.
+            </p>
+            <p class="stack">Java 25 · Spring Boot · PostgreSQL · Kafka · Redis · AWS</p>
+          </article>
+          <article class="project-card">
+            <h3>Microservices at Beacon</h3>
+            <p>
+              Designed and delivered scalable microservices and API integrations across multiple
+              domains, using event-driven patterns to improve throughput and service reliability.
+            </p>
+            <p class="stack">Java 11 · Spring Boot · OpenAPI · SQS · Kinesis · Kafka</p>
+          </article>
+          <article class="project-card">
+            <h3>Credit Bureau System</h3>
+            <p>
+              Led full-stack enhancements for credit bureau services, covering secure data ingestion,
+              processing pipelines, and operational tooling for internal business users.
+            </p>
+            <p class="stack">Java 8 · Spring Boot · Angular · MongoDB</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="skills" class="section container reveal">
+        <div class="section-heading">
+          <h2>Skills</h2>
+          <p>Core technologies and strengths.</p>
+        </div>
+        <div class="skills-grid">
+          <div class="skill-group card">
+            <h3>Languages</h3>
+            <p>Java, Python, SQL, JavaScript, Cantonese, English, Mandarin</p>
+          </div>
+          <div class="skill-group card">
+            <h3>Frameworks</h3>
+            <p>Spring Boot, OpenAPI, GraphQL, Angular, Node.js</p>
+          </div>
+          <div class="skill-group card">
+            <h3>Cloud & DevOps</h3>
+            <p>AWS, SQS, Kinesis, Kafka, Redis, DynamoDB, PostgreSQL</p>
+          </div>
+          <div class="skill-group card">
+            <h3>Engineering Focus</h3>
+            <p>Software Design, Microservices, Backend APIs, Event-Driven Systems</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="education" class="section container reveal">
+        <div class="section-heading">
+          <h2>Education</h2>
+          <p>Academic background in computer engineering.</p>
+        </div>
+        <div class="timeline">
+          <article class="card">
+            <p class="meta">2012 - 2015</p>
+            <h3>The Hong Kong University of Science and Technology</h3>
+            <p>Bachelor&apos;s Degree, Computer Engineering</p>
+          </article>
+          <article class="card">
+            <p class="meta">2010 - 2012</p>
+            <h3>Hong Kong Community College, The Hong Kong Polytechnic University</h3>
+            <p>Associate&apos;s Degree, Engineering</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="contact" class="section container reveal">
+        <h2>Contact</h2>
+        <p>
+          I&apos;m open to software engineering opportunities and collaboration on ambitious products.
+        </p>
+        <p class="contact-note">Preferred name: Jove · Official name: Siu Yu Tsui</p>
+        <div class="contact-links">
+          <a href="mailto:jovehammer16@gmail.com">jovehammer16@gmail.com</a>
+          <!-- <a href="tel:"></a> -->
+          <a href="https://www.linkedin.com/in/jove-tsui" target="_blank" rel="noreferrer">LinkedIn</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>© <span id="year"></span> Jove Tsui (Siu Yu Tsui). Built for impact.</p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
