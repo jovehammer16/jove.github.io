@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Speeding Up Cancellation Processing: Batch, Dedup, and Safer Throughput</title>
+  <meta name="description"
+    content="Scaling points cancellation processing using batching, bounded parallelism, and database-level idempotency." />
+
+  <meta property="og:title" content="Speeding Up Cancellation Processing: Batch, Dedup, and Safer Throughput" />
+  <meta property="og:description"
+    content="Batch consumption, bounded parallel external calls, and DB-enforced idempotency to process cancellation backlogs safely." />
+  <meta property="og:type" content="article" />
+  <meta name="keywords" content="Distributed Systems, Database Design, Java, Spring Boot, Kafka, High Availability, Backend Engineering" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #f5f3ee;
+      --surface: rgba(254, 252, 248, 0.84);
+      --ink: #1a1b1f;
+      --muted: #4f535e;
+      --accent: #0d5f5b;
+      --accent-strong: #0a4542;
+      --line: rgba(25, 28, 32, 0.12);
+      --shadow: 0 18px 48px rgba(21, 24, 28, 0.12);
+      --codebg: #eef2ef;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, rgba(13, 95, 91, 0.16), transparent 30%),
+        radial-gradient(circle at 80% 8%, rgba(220, 148, 101, 0.16), transparent 28%),
+        linear-gradient(160deg, #f9f7f2 0%, #ece8df 58%, #e8e2d7 100%);
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: min(920px, 92vw);
+      margin: 0 auto;
+      padding: 3rem 0 4rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .background-shape {
+      position: fixed;
+      z-index: 0;
+      filter: blur(40px);
+      opacity: 0.7;
+      border-radius: 999px;
+    }
+
+    .shape-one { width: 350px; height: 350px; background: rgba(26, 132, 125, 0.3); top: -80px; right: -80px; }
+    .shape-two { width: 280px; height: 280px; background: rgba(208, 115, 61, 0.28); bottom: -80px; left: -60px; }
+
+    .top-link {
+      display: inline-block;
+      margin-bottom: 1.1rem;
+      text-decoration: none;
+      color: var(--accent-strong);
+      font-weight: 600;
+      border-bottom: 1px solid rgba(13, 95, 91, 0.36);
+    }
+
+    header {
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1rem;
+    }
+
+    h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 16px; }
+
+    article {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.3rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .toc {
+      background: rgba(0, 0, 0, 0.03);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc h4 { margin: 0 0 0.5rem 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .toc ul { list-style: none; padding: 0; margin: 0; }
+    .toc li { margin: 4px 0; font-size: 15px; }
+
+    h2 { margin: 26px 0 10px; font-size: 22px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    h3 { margin: 18px 0 8px; font-size: 18px; }
+
+    p { margin: 10px 0; color: var(--muted); }
+    ul, ol { margin: 10px 0 10px 22px; }
+    li { margin: 6px 0; color: var(--muted); }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(13, 95, 91, 0.05);
+      padding: 12px 14px;
+      border-radius: 0 10px 10px 0;
+      margin: 14px 0;
+      color: var(--ink);
+      font-size: 0.95em;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      color: var(--accent-strong);
+      margin-right: 4px;
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 14px 0;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    code { font-family: "IBM Plex Mono", monospace; font-size: 0.9em; }
+
+    footer {
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .checklist li::before { content: "✅"; margin-right: 10px; }
+    .checklist { list-style: none; padding-left: 0; }
+
+    @media (max-width: 680px) { .container { padding-top: 2.25rem; } }
+  </style>
+</head>
+
+<body>
+  <div class="background-shape shape-one" aria-hidden="true"></div>
+  <div class="background-shape shape-two" aria-hidden="true"></div>
+
+  <div class="container">
+    <a class="top-link" href="../index.html#blog">← Back to blog</a>
+
+    <header>
+      <h1>Speeding Up Cancellation Processing: Batch, Dedup, and Safer Throughput</h1>
+      <p class="subtitle"><em>Scaling “reversal” event handling in distributed systems</em></p>
+      <div style="margin-top: 10px;">
+        <span class="badge">Distributed Systems</span>
+        <span class="badge">Database Design</span>
+        <span class="badge">Java</span>
+        <span class="badge">Spring Boot</span>
+        <span class="badge">Kafka</span>
+        <span class="badge">High Availability</span>
+      </div>
+    </header>
+
+    <article>
+      <nav class="toc">
+<h4>Table of Contents</h4>
+        <ul>
+          <li><a href="#problem">1. The Problem: Latency & Duplicates</a></li>
+          <li><a href="#solution">2. The Solution Architecture</a></li>
+          <li><a href="#partial-failures">3. Handling Partial Failures</a></li>
+          <li><a href="#why-this-matters">4. Why This Matters</a></li>
+          <li><a href="#summary">5. Summary & Practical Notes</a></li>
+        </ul>
+      </nav>
+
+      <p id="problem">
+        In high-volume backend services, processing <strong>points reversal / cancellation</strong> events often hits 
+        the same wall: how to catch up with backlogs without overwhelming external dependencies or corrupting ledger state.
+      </p>
+
+      <h2 id="solution">The Solution: Batch + Bounded Parallelism + DB-level Idempotency</h2>
+
+      <h3>1) Batch Consumption</h3>
+      <p>Instead of one-by-one processing, we consume messages in controlled chunks.</p>
+      <pre><code>@KafkaListener(containerFactory = "batchListenerFactory")
+public void consume(List&lt;ConsumerRecord&lt;String, String&gt;&gt; records) {
+    List&lt;Event&gt; events = parse(records);
+    cancellationService.process(events);
+}</code></pre>
+
+      <h3>2) Bounded Parallel External Calls</h3>
+      <p>
+        Within a batch, fetch balance data in parallel. 
+      </p>
+      <div class="note">
+        <strong>Tuning Tip:</strong> Your thread pool size (<code>PoolSize</code>) should be tuned based on the 
+        <strong>downstream API's rate limits</strong> and latency, not just your own CPU cores. I/O-bound tasks 
+        usually require a larger pool than CPU-bound tasks.
+      </div>
+      <pre><code>// Parallel fetch and collect into a HashMap for O(1) lookup
+Map&lt;String, Balance&gt; balanceMap = futures.stream()
+    .map(CompletableFuture::join)
+    .collect(Collectors.toMap(
+        Balance::getCustomerId, 
+        b -&gt; b, 
+        (existing, _) -&gt; existing
+    ));</code></pre>
+
+      <h3>3) Efficient Batch Insert with Idempotency</h3>
+      <p>
+        Instead of executing 100 <code>INSERT</code> statements, we combine them into one. We leverage 
+        <code>ON CONFLICT DO NOTHING</code> to handle duplicates at the storage layer.
+      </p>
+      <pre><code>// Example SQL generated by the service
+INSERT INTO ledger_entries (customer_id, amount, entry_type, source_id)
+VALUES 
+  ('cust_01', -100, 'REVERSAL', 'tx_999'),
+  ('cust_02', -50,  'REVERSAL', 'tx_888')
+ON CONFLICT (customer_id, source_id) WHERE entry_type = 'REVERSAL'
+DO NOTHING;</code></pre>
+
+      <h3>4) Partial Unique Index (The Safety Net)</h3>
+      <p>We only want to dedupe reversal events, leaving other transaction types flexible.</p>
+      <pre><code>CREATE UNIQUE INDEX uq_reversal_by_customer_source
+ON ledger_entries (customer_id, source_transaction_id)
+WHERE entry_type = 'REVERSAL';</code></pre>
+
+      <h3>5) Publish Only for New Rows</h3>
+      <p>
+        To prevent downstream duplicate events, we only publish messages for rows that were actually inserted.
+      </p>
+      <div class="note">
+        <strong>Cross-DB Note:</strong> While PostgreSQL supports <code>INSERT ... RETURNING</code>, 
+        MySQL users might rely on <code>ROW_COUNT()</code> or a separate <code>SELECT</code> check if 
+        batch-level granular reporting is required.
+      </div>
+      <pre><code>// Only publish if the ID exists in the set of successfully inserted records
+Set&lt;UUID&gt; insertedIds = repository.batchInsert(ledgerEntries);
+
+events.stream()
+    .filter(e -&gt; insertedIds.contains(e.getId()))
+    .forEach(e -&gt; producer.send(buildMsg(e)));</code></pre>
+
+    <h3>6) End-to-End Batching: The Kafka Producer</h3>
+      <p>
+        After the database insert, we only publish events for <strong>newly created</strong> records. 
+        To maintain high throughput, the Kafka producer should also be tuned for batching.
+      </p>
+      <div class="note">
+        <strong>Performance Tip:</strong> In Kafka, "sending" is asynchronous by default. Fine-tune <code>linger.ms</code> 
+        (e.g., 5-10ms) and <code>batch.size</code> (e.g., 32KB) to allow the producer to buffer and compress 
+        multiple records into a single network request.
+      </div>
+      <pre><code>// Example: Only publish for IDs successfully inserted in this batch
+Set&lt;UUID&gt; insertedIds = repository.batchInsert(ledgerEntries);
+
+events.stream()
+    .filter(e -&gt; insertedIds.contains(e.getId()))
+    .forEach(e -&gt; producer.send(new ProducerRecord&lt;&gt;(topic, e.getKey(), e.payload())));</code></pre>
+
+      <h2 id="partial-failures">Handling Partial Failures</h2>
+      <p>
+        In a batch of 100, what if 1 event fails while 99 are valid? 
+      </p>
+      <ul>
+        <li><strong>Individual Try-Catch:</strong> Wrap external calls. If one fails, exclude it from the DB batch.</li>
+        <li><strong>Partial DB Inserts:</strong> <code>ON CONFLICT DO NOTHING</code> allows valid rows to persist even if others are duplicates.</li>
+        <li><strong>Dead Letter Queue (DLQ):</strong> Route only the truly unprocessable events to a DLQ.</li>
+      </ul>
+
+      <h2 id="why-this-matters">Why This Matters</h2>
+      <ul class="checklist">
+        <li>Higher throughput during catch-up / spikes</li>
+        <li>No duplicate deductions</li>
+        <li>Lower DB overhead</li>
+        <li>Safer retry behavior</li>
+        <li>Downstream systems protected via backpressure</li>
+      </ul>
+
+      <h2 id="summary">Summary & Practical Notes</h2>
+      <ul class="checklist">
+        <li><strong>Backpressure:</strong> Use a <em>Caller-Runs</em> policy to slow down the producer when threads are saturated.</li>
+        <li><strong>Metrics:</strong> Monitor the ratio of "Inserted" vs "Duplicate Ignored" to detect retry storms.</li>
+        <li><strong>Config:</strong> Keep pool sizes and batch sizes configurable for real-time tuning.</li>
+      </ul>
+
+      <footer>
+        <p><strong>Disclaimer:</strong> This article is a generalized description of common scaling patterns. Examples are illustrative.</p>
+        <p class="meta">Last updated: 2026-02-13</p>
+      </footer>
+    </article>
+  </div>
+</body>
+</html>
