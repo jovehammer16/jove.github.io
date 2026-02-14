@@ -219,7 +219,7 @@ Map&lt;String, Balance&gt; balanceMap = futures.stream()
     .collect(Collectors.toMap(
         Balance::getCustomerId, 
         b -&gt; b, 
-        (existing, _) -&gt; existing
+        (existing, replacement) -&gt; replacement
     ));</code></pre>
 
       <h3>3) Efficient Batch Insert with Idempotency</h3>
