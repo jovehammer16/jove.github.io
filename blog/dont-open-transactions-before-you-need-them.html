@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Don't Open a Transaction Before You Need One</title>
+  <meta name="description"
+    content="A Spring Boot incident lesson on keeping transaction boundaries small, avoiding remote calls inside database transactions, and using indexes for idempotency checks." />
+
+  <meta property="og:title" content="Don't Open a Transaction Before You Need One" />
+  <meta property="og:description"
+    content="Why broad @Transactional orchestration can exhaust connection pools, and how to keep database transactions narrow and intentional." />
+  <meta property="og:type" content="article" />
+  <meta name="keywords" content="Spring Boot, Java, PostgreSQL, Transactions, Connection Pooling, Database Design, Backend Engineering" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #f5f3ee;
+      --surface: rgba(254, 252, 248, 0.84);
+      --ink: #1a1b1f;
+      --muted: #4f535e;
+      --accent: #0d5f5b;
+      --accent-strong: #0a4542;
+      --line: rgba(25, 28, 32, 0.12);
+      --shadow: 0 18px 48px rgba(21, 24, 28, 0.12);
+      --codebg: #eef2ef;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, rgba(13, 95, 91, 0.16), transparent 30%),
+        radial-gradient(circle at 80% 8%, rgba(220, 148, 101, 0.16), transparent 28%),
+        linear-gradient(160deg, #f9f7f2 0%, #ece8df 58%, #e8e2d7 100%);
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: min(920px, 92vw);
+      margin: 0 auto;
+      padding: 3rem 0 4rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .background-shape {
+      position: fixed;
+      z-index: 0;
+      filter: blur(40px);
+      opacity: 0.7;
+      border-radius: 999px;
+    }
+
+    .shape-one { width: 350px; height: 350px; background: rgba(26, 132, 125, 0.3); top: -80px; right: -80px; }
+    .shape-two { width: 280px; height: 280px; background: rgba(208, 115, 61, 0.28); bottom: -80px; left: -60px; }
+
+    .top-link {
+      display: inline-block;
+      margin-bottom: 1.1rem;
+      text-decoration: none;
+      color: var(--accent-strong);
+      font-weight: 600;
+      border-bottom: 1px solid rgba(13, 95, 91, 0.36);
+    }
+
+    header {
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1rem;
+    }
+
+    h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 16px; }
+
+    article {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.3rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .toc {
+      background: rgba(0, 0, 0, 0.03);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc h4 { margin: 0 0 0.5rem 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .toc ul { list-style: none; padding: 0; margin: 0; }
+    .toc li { margin: 4px 0; font-size: 15px; }
+
+    h2 { margin: 26px 0 10px; font-size: 22px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    h3 { margin: 18px 0 8px; font-size: 18px; }
+
+    p { margin: 10px 0; color: var(--muted); }
+    ul, ol { margin: 10px 0 10px 22px; }
+    li { margin: 6px 0; color: var(--muted); }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(13, 95, 91, 0.05);
+      padding: 12px 14px;
+      border-radius: 0 10px 10px 0;
+      margin: 14px 0;
+      color: var(--ink);
+      font-size: 0.95em;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      color: var(--accent-strong);
+      margin-right: 4px;
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 14px 0;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    code { font-family: "IBM Plex Mono", monospace; font-size: 0.9em; }
+
+    footer {
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .checklist li::before { content: "✅"; margin-right: 10px; }
+    .checklist { list-style: none; padding-left: 0; }
+
+    @media (max-width: 680px) { .container { padding-top: 2.25rem; } }
+  </style>
+</head>
+
+<body>
+  <div class="background-shape shape-one" aria-hidden="true"></div>
+  <div class="background-shape shape-two" aria-hidden="true"></div>
+
+  <div class="container">
+    <a class="top-link" href="../index.html#blog">← Back to blog</a>
+
+    <header>
+      <h1>Don't Open a Transaction Before You Need One</h1>
+      <p class="subtitle"><em>A Spring Boot incident lesson about transaction boundaries, connection pools, and idempotency checks</em></p>
+      <div style="margin-top: 10px;">
+        <span class="badge">Spring Boot</span>
+        <span class="badge">Java</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">Transactions</span>
+        <span class="badge">Connection Pooling</span>
+        <span class="badge">Backend Engineering</span>
+      </div>
+    </header>
+
+    <article>
+      <nav class="toc">
+        <h4>Table of Contents</h4>
+        <ul>
+          <li><a href="#problem">1. The Problem: A Small Traffic Spike, Big Pool Exhaustion</a></li>
+          <li><a href="#anti-pattern">2. The Anti-pattern: Transactional Orchestration</a></li>
+          <li><a href="#fix">3. The Fix: Narrow the Write Transaction</a></li>
+          <li><a href="#reads">4. What About Fresh Reads?</a></li>
+          <li><a href="#indexes">5. Indexes and Idempotency</a></li>
+          <li><a href="#summary">6. Practical Rules</a></li>
+        </ul>
+      </nav>
+
+      <p id="problem">
+        A common production failure mode in Spring services is not high CPU, a memory leak, or a broken deployment.
+        Sometimes it is simply this: the service runs out of database connections because each request holds a
+        connection for much longer than necessary.
+      </p>
+
+      <p>
+        In one incident pattern, an API endpoint received a higher-than-usual number of invalid adjustment requests.
+        Many of them failed validation with a client error, but the service still started a database transaction before
+        doing the checks that would eventually reject the request. The result was a saturated connection pool:
+      </p>
+
+      <pre><code>Connection is not available, request timed out after ...
+(active connections exhausted, requests waiting)</code></pre>
+
+      <p>
+        The interesting part is that the failing requests were not supposed to write anything. They were mostly doing
+        an idempotency lookup, fetching related data, and calling another internal service. The transaction was opened
+        too early.
+      </p>
+
+      <h2 id="anti-pattern">The Anti-pattern: Transactional Orchestration</h2>
+      <p>
+        The problematic shape looked roughly like this:
+      </p>
+
+      <pre><code>@Transactional
+public AdjustmentResponse handleAdjustment(AdjustmentRequest request) {
+    // Read-only idempotency check
+    if (ledgerRepository.existsByExternalEventId(request.externalEventId())) {
+        throw new DuplicateRequestException();
+    }
+
+    // Remote HTTP call
+    SourceRecord sourceRecord = externalRecordClient.findSourceRecord(request.sourceRecordId());
+
+    // Request validation
+    validateAdjustment(request, sourceRecord);
+
+    // Actual database writes happen only down here
+    LedgerContext context = ledgerProcessor.applyAdjustment(request, sourceRecord);
+
+    return mapper.toResponse(context);
+}</code></pre>
+
+      <p>
+        This is attractive because it feels safe: "the whole use case is transactional". But the method is not just a
+        database write. It is orchestration. It reads, calls other services, validates business rules, builds a model,
+        then finally writes.
+      </p>
+
+      <div class="note">
+        <strong>The rule is not "never use <code>@Transactional</code> for reads".</strong>
+        A short <code>@Transactional(readOnly = true)</code> method can be perfectly valid. The issue is putting a broad
+        write transaction around slow orchestration, remote calls, retries, and checks that do not need a write
+        connection.
+      </div>
+
+      <h2 id="fix">The Fix: Narrow the Write Transaction</h2>
+      <p>
+        A better shape is to keep pre-checks and downstream calls outside the write transaction, then enter a
+        transactional method only when mutation starts.
+      </p>
+
+      <pre><code>public AdjustmentResponse handleAdjustment(AdjustmentRequest request) {
+    if (ledgerRepository.existsByExternalEventId(request.externalEventId())) {
+        throw new DuplicateRequestException();
+    }
+
+    SourceRecord sourceRecord = externalRecordClient.findSourceRecord(request.sourceRecordId());
+    validateAdjustment(request, sourceRecord);
+
+    AdjustmentCommand command = buildAdjustmentCommand(request, sourceRecord);
+
+    // Narrow transactional boundary
+    LedgerContext context = ledgerProcessor.applyAdjustment(command);
+
+    return mapper.toResponse(context);
+}</code></pre>
+
+      <pre><code>@Transactional
+public LedgerContext applyAdjustment(AdjustmentCommand command) {
+    LedgerContext context = calculator.calculate(command);
+    UUID ledgerEntryId = ledgerRepository.insert(context.toLedgerEntry());
+    ledgerContextRepository.insert(context.toContextLog(ledgerEntryId));
+    return context;
+}</code></pre>
+
+      <p>
+        Now the connection is held only during the actual write path. If the request is invalid, or if the remote
+        source record lookup returns nothing, the service does not occupy a write transaction while waiting.
+      </p>
+
+      <h2 id="reads">What About Fresh Reads?</h2>
+      <p>
+        Removing <code>@Transactional</code> does not mean reads become stale by default. In PostgreSQL's default
+        <code>READ COMMITTED</code> isolation, each standalone query still runs in its own short transaction and sees
+        data committed before that statement starts.
+      </p>
+
+      <p>
+        The real "freshness" question is usually about which datasource you read from. If an idempotency check reads
+        from a read replica, replica lag can make the service miss a row that was just written to the primary. For
+        critical idempotency checks, consider reading from the primary/write datasource even if the query is read-only.
+      </p>
+
+      <pre><code>public boolean existsByExternalEventId(UUID externalEventId) {
+    return Boolean.TRUE.equals(writeJdbcTemplate.queryForObject(
+        EXISTS_BY_EXTERNAL_EVENT_ID,
+        Boolean.class,
+        externalEventId
+    ));
+}</code></pre>
+
+      <h2 id="indexes">Indexes and Idempotency</h2>
+      <p>
+        Pre-checks need to be cheap. If an idempotency check searches by <code>external_event_id</code>, make sure the
+        database has an index that supports that lookup.
+      </p>
+
+      <pre><code>CREATE INDEX CONCURRENTLY IF NOT EXISTS ledger_entries_external_event_id_idx
+ON ledger_entries(external_event_id)
+WHERE external_event_id IS NOT NULL;</code></pre>
+
+      <p>
+        A partial index is useful when <code>external_event_id</code> can be null. It keeps the index smaller and focused on
+        the rows that can actually be found by the idempotency check.
+      </p>
+
+      <div class="note">
+        <strong>Performance and correctness are separate.</strong>
+        A non-unique index makes the check fast. A unique constraint or unique partial index is what prevents races.
+        Before adding uniqueness, confirm the domain model: can one external event produce multiple valid ledger
+        rows, entry types, actions, or partial adjustments?
+      </div>
+
+      <h2 id="summary">Practical Rules</h2>
+      <ul class="checklist">
+        <li>Do not put <code>@Transactional</code> on a whole orchestration method by default.</li>
+        <li>Do not call remote services while holding a database transaction unless there is a deliberate reason.</li>
+        <li>Keep write transactions close to the writes they protect.</li>
+        <li>Use <code>@Transactional(readOnly = true)</code> intentionally for short, consistent read operations.</li>
+        <li>Use the primary datasource for idempotency checks when replica lag would be unsafe.</li>
+        <li>Back every frequent lookup with an index that matches the actual query shape.</li>
+        <li>Use database constraints for correctness; use pre-checks for better user errors and cheaper happy paths.</li>
+      </ul>
+
+      <footer>
+        <p><strong>Disclaimer:</strong> This article is a generalized description of a backend reliability pattern. Examples are illustrative and anonymized.</p>
+        <p class="meta">Last updated: 2026-06-10</p>
+      </footer>
+    </article>
+  </div>
+</body>
+</html>
