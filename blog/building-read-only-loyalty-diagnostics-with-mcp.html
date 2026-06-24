@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Building a Read-Only MCP Server for Loyalty Diagnostics</title>
+  <meta name="description"
+    content="An anonymized backend case study on designing a read-only Model Context Protocol service for loyalty support diagnostics." />
+
+  <meta property="og:title" content="Building a Read-Only MCP Server for Loyalty Diagnostics" />
+  <meta property="og:description"
+    content="How controlled MCP tools can turn loyalty support investigations into safe, structured, repeatable diagnostics." />
+  <meta property="og:type" content="article" />
+  <meta name="keywords"
+    content="Model Context Protocol, MCP, Java, Spring Boot, PostgreSQL, Diagnostics, Backend Engineering, AI Tools" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;family=IBM+Plex+Mono:wght@400;600&amp;display=swap"
+    rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #f5f3ee;
+      --surface: rgba(254, 252, 248, 0.84);
+      --ink: #1a1b1f;
+      --muted: #4f535e;
+      --accent: #0d5f5b;
+      --accent-strong: #0a4542;
+      --line: rgba(25, 28, 32, 0.12);
+      --shadow: 0 18px 48px rgba(21, 24, 28, 0.12);
+      --codebg: #eef2ef;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, rgba(13, 95, 91, 0.16), transparent 30%),
+        radial-gradient(circle at 80% 8%, rgba(220, 148, 101, 0.16), transparent 28%),
+        linear-gradient(160deg, #f9f7f2 0%, #ece8df 58%, #e8e2d7 100%);
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: min(920px, 92vw);
+      margin: 0 auto;
+      padding: 3rem 0 4rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .background-shape {
+      position: fixed;
+      z-index: 0;
+      filter: blur(40px);
+      opacity: 0.7;
+      border-radius: 999px;
+    }
+
+    .shape-one { width: 350px; height: 350px; background: rgba(26, 132, 125, 0.3); top: -80px; right: -80px; }
+    .shape-two { width: 280px; height: 280px; background: rgba(208, 115, 61, 0.28); bottom: -80px; left: -60px; }
+
+    .top-link {
+      display: inline-block;
+      margin-bottom: 1.1rem;
+      text-decoration: none;
+      color: var(--accent-strong);
+      font-weight: 600;
+      border-bottom: 1px solid rgba(13, 95, 91, 0.36);
+    }
+
+    header {
+      margin-bottom: 1.2rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1rem;
+    }
+
+    h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -0.02em; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 16px; }
+
+    article {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.3rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .toc {
+      background: rgba(0, 0, 0, 0.03);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc h4 { margin: 0 0 0.5rem 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .toc ul { list-style: none; padding: 0; margin: 0; }
+    .toc li { margin: 4px 0; font-size: 15px; }
+
+    h2 { margin: 26px 0 10px; font-size: 22px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    h3 { margin: 18px 0 8px; font-size: 18px; }
+
+    p { margin: 10px 0; color: var(--muted); }
+    ul, ol { margin: 10px 0 10px 22px; }
+    li { margin: 6px 0; color: var(--muted); }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(13, 95, 91, 0.05);
+      padding: 12px 14px;
+      border-radius: 0 10px 10px 0;
+      margin: 14px 0;
+      color: var(--ink);
+      font-size: 0.95em;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      color: var(--accent-strong);
+      margin-right: 4px;
+      font-weight: 600;
+    }
+
+    pre {
+      margin: 14px 0;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--codebg);
+      border: 1px solid var(--line);
+      overflow-x: auto;
+    }
+
+    code { font-family: "IBM Plex Mono", monospace; font-size: 0.9em; }
+
+    footer {
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 680px) { .container { padding-top: 2.25rem; } }
+  </style>
+</head>
+
+<body>
+  <div class="background-shape shape-one" aria-hidden="true"></div>
+  <div class="background-shape shape-two" aria-hidden="true"></div>
+
+  <div class="container">
+    <a class="top-link" href="../index.html#blog">&larr; Back to blog</a>
+
+    <header>
+      <h1>Building a Read-Only MCP Server for Loyalty Diagnostics</h1>
+      <p class="subtitle"><em>Turning repetitive support investigations into safe, structured AI tools</em></p>
+      <div style="margin-top: 10px;">
+        <span class="badge">Model Context Protocol</span>
+        <span class="badge">Spring Boot</span>
+        <span class="badge">Java</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">Diagnostics</span>
+        <span class="badge">Backend Engineering</span>
+      </div>
+    </header>
+
+    <article>
+      <nav class="toc">
+        <h4>Table of Contents</h4>
+        <ul>
+          <li><a href="#problem">1. The Problem: Support Needed Evidence, Not Guesswork</a></li>
+          <li><a href="#shape">2. The Shape of the Service</a></li>
+          <li><a href="#tools">3. Designing Tools Around Workflows</a></li>
+          <li><a href="#safety">4. Safety and Privacy Boundaries</a></li>
+          <li><a href="#implementation">5. Implementation Notes</a></li>
+          <li><a href="#lessons">6. Lessons Learned</a></li>
+        </ul>
+      </nav>
+
+      <p id="problem">
+        Operational support for a loyalty platform can be surprisingly hard. A simple customer question like
+        "where did my points go?" may require checking profile state, card links, point balances, holds, order
+        traces, campaign activity, audit history, and sometimes migration history.
+      </p>
+
+      <p>
+        The old way to answer those questions was a mix of dashboards, SQL snippets, service logs, and tribal
+        knowledge. It worked, but it was slow and risky. Raw database access is too powerful for repetitive
+        support checks, and large language models should not be handed arbitrary SQL access just because they
+        are good at summarising evidence.
+      </p>
+
+      <p>
+        The design I settled on was a small Model Context Protocol server: read-only, purpose-built, and shaped
+        around the diagnostic questions engineers actually answer.
+      </p>
+
+      <h2 id="shape">The Shape of the Service</h2>
+      <p>
+        The service is a Spring Boot application exposing MCP tools over HTTP. The agent does not connect to
+        production databases directly. It calls a fixed set of tools, each with typed inputs and a narrow output
+        model.
+      </p>
+
+      <pre><code>AI agent
+  |
+  | MCP tool call
+  v
+Read-only diagnostics service
+  |
+  +-- tool layer: named workflows, read-only hints
+  +-- validator: UUIDs, dates, site codes, limits
+  +-- service layer: compose evidence across systems
+  +-- repository layer: fixed SQL per data source
+  |
+  v
+Read-only data sources</code></pre>
+
+      <p>
+        The important decision is that the MCP service is not a general-purpose database proxy. It is closer to
+        an operational API for investigation. Every tool represents a question we are comfortable letting an
+        agent ask.
+      </p>
+
+      <h2 id="tools">Designing Tools Around Workflows</h2>
+      <p>
+        I found it more useful to expose investigation workflows than to expose individual tables. The tool set
+        ended up covering a few common support paths:
+      </p>
+
+      <ul>
+        <li><strong>Customer snapshot:</strong> current loyalty profile, active cards, points balance, and held points.</li>
+        <li><strong>Card trace:</strong> where a card is linked now, and whether there are suspicious duplicate active links.</li>
+        <li><strong>Order trace:</strong> transaction rows, points logs, context summaries, and holds for one order or source ID.</li>
+        <li><strong>Transaction trace:</strong> adapter state and points ledger logs for a customer or transaction ID.</li>
+        <li><strong>Promotion trace:</strong> active promotions or a specific promotion by ID and market.</li>
+        <li><strong>Audit trace:</strong> focused customer audit history, including merge-related events.</li>
+        <li><strong>Health check:</strong> whether the configured read-only data sources are reachable.</li>
+      </ul>
+
+      <p>
+        Each response includes raw enough evidence to be auditable, but not so much that the agent has to
+        rediscover the whole domain every time. For example, an order trace returns the rows it found plus a
+        compact summary such as counts of reserve, purchase, refund, and held-point signals.
+      </p>
+
+      <div class="note">
+        The best tools were the ones named after support questions, not storage concepts. "Trace this order" is a
+        better interface than "query these five tables and infer the state yourself."
+      </div>
+
+      <h2 id="safety">Safety and Privacy Boundaries</h2>
+      <p>
+        The first safety rule is simple: no writes. The service uses read-only data source credentials, configures
+        database sessions as read-only, and exposes no mutation tools. It is for diagnosis, not repair.
+      </p>
+
+      <p>
+        The second rule is to avoid arbitrary SQL. Agents are good at exploring, but exploration against live
+        systems needs guardrails. Fixed tool contracts make the blast radius smaller:
+      </p>
+
+      <ul>
+        <li>Only known workflows are exposed.</li>
+        <li>Inputs are validated before reaching the repository layer.</li>
+        <li>Row limits are capped.</li>
+        <li>Dates must be explicit and parseable.</li>
+        <li>Identifiers must match expected formats.</li>
+        <li>Partial failures are returned as diagnostic gaps rather than hidden behind confident prose.</li>
+      </ul>
+
+      <p>
+        Privacy matters as much as database safety. A public demo or blog post should use synthetic identifiers,
+        generic market names, and anonymized examples. Internally, the MCP result may contain data needed for an
+        investigation; externally, the story should focus on the design pattern.
+      </p>
+
+      <h2 id="implementation">Implementation Notes</h2>
+      <h3>Read-only tool declarations</h3>
+      <p>
+        Each MCP method is declared as read-only and idempotent. That metadata is not a substitute for proper
+        database controls, but it documents intent at the tool boundary and helps compatible clients reason about
+        safe tool usage.
+      </p>
+
+      <pre><code>@McpTool(
+    name = "get_customer_snapshot",
+    description = "Read-only snapshot of loyalty state for a customer and market",
+    annotations = @McpAnnotations(
+        readOnlyHint = true,
+        destructiveHint = false,
+        idempotentHint = true
+    )
+)
+public CustomerSnapshot getCustomerSnapshot(String customerId, int marketId) {
+    CustomerMarketInput input = validator.parseCustomerMarket(customerId, marketId);
+    return diagnosticsService.getCustomerSnapshot(input.customerId(), input.marketId());
+}</code></pre>
+
+      <h3>Validation at the edge</h3>
+      <p>
+        The tool layer validates UUIDs, optional filters, ISO timestamps, site or market identifiers, order IDs,
+        card IDs, and result limits. Invalid input fails early with a clear message instead of becoming a slow or
+        unsafe query.
+      </p>
+
+      <h3>Repository isolation</h3>
+      <p>
+        The repository layer owns source-specific SQL. The service layer composes those repositories into business
+        traces: customer state, order state, promotion state, and audit state. This keeps the MCP tool methods
+        small and keeps database details out of the agent-facing contract.
+      </p>
+
+      <h3>Probable issue flags</h3>
+      <p>
+        One useful addition was a small "probable issue" field on diagnostic responses. It does not replace the
+        evidence, but it gives the agent a stable signal to start from:
+      </p>
+
+      <pre><code>{
+  "orderId": "ORDER-123",
+  "summary": {
+    "purchaseLogCount": 1,
+    "refundLogCount": 2,
+    "hasHeldPoints": false
+  },
+  "probableIssue": "POSSIBLE_DUPLICATE_REVERSAL"
+}</code></pre>
+
+      <p>
+        These flags are deliberately plain and conservative. They help the response stay concrete: "I found this
+        evidence, and this is the likely category of problem."
+      </p>
+
+      <h3>Health checks as a first-class tool</h3>
+      <p>
+        A diagnostics service is only useful if you can tell whether its own data sources are reachable. Exposing
+        health as an MCP tool made setup and incident checks much easier. Before investigating a customer issue,
+        the agent can verify whether the underlying sources are up, down, or unconfigured.
+      </p>
+
+      <h2 id="lessons">Lessons Learned</h2>
+      <ol>
+        <li>
+          <strong>Build tools for questions, not tables.</strong>
+          Support workflows start with business questions. The API should match that shape.
+        </li>
+        <li>
+          <strong>Read-only still needs design.</strong>
+          A read-only query can still be expensive, confusing, or privacy-sensitive.
+        </li>
+        <li>
+          <strong>Return evidence and interpretation separately.</strong>
+          Raw rows let an engineer verify the answer. Summary fields and issue flags help the agent explain it.
+        </li>
+        <li>
+          <strong>Make failure visible.</strong>
+          If one data source times out, the result should say what was missing instead of pretending the world is
+          complete.
+        </li>
+        <li>
+          <strong>Redaction is part of the product.</strong>
+          A tool used by agents should make it easy to answer with only the necessary customer information.
+        </li>
+      </ol>
+
+      <p>
+        MCP is useful here because it gives agents a clean way to call operational tools. The real value, though,
+        comes from the boring backend discipline around it: narrow interfaces, read-only credentials, input
+        validation, capped outputs, health checks, and clear domain-specific summaries.
+      </p>
+    </article>
+
+    <footer>
+      <p>Published 2026-06-24. Examples are anonymized and simplified to avoid exposing company-specific systems,
+        customer data, or internal infrastructure details.</p>
+    </footer>
+  </div>
+</body>
+
+</html>
